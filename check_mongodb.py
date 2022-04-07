@@ -308,17 +308,22 @@ def mongo_connect(host=None, port=None, ssl=False, user=None, passwd=None, repli
 
     if ssl:
         if insecure:
-            con_args['ssl_cert_reqs'] = SSL.CERT_NONE
+            con_args['tlsAllowInvalidCertificates'] = True
         else:
-            con_args['ssl_cert_reqs'] = SSL.CERT_REQUIRED
+            con_args['tlsAllowInvalidCertificates'] = False
         con_args['ssl'] = ssl
         if ssl_ca_cert_file:
-            con_args['ssl_ca_certs'] = ssl_ca_cert_file
+            con_args['tlsCAFile'] = ssl_ca_cert_file
         if ssl_cert:
-            con_args['ssl_certfile'] = ssl_cert
+            con_args['tlsCertificateKeyFile'] = ssl_cert
 
     if retry_writes_disabled:
         con_args['retryWrites'] = False
+
+    # auth changed in pymongo4 https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#database-authenticate-and-database-logout-are-removed
+    if user and passwd:
+        con_args["username"] = user
+        con_args["password"] = passwd
 
     try:
         # ssl connection for pymongo > 2.3
@@ -334,12 +339,12 @@ def mongo_connect(host=None, port=None, ssl=False, user=None, passwd=None, repli
                 con = pymongo.Connection(host, port, slave_okay=True, network_timeout=10)
 
         # we must authenticate the connection, otherwise we won't be able to perform certain operations
-        if ssl_cert and ssl_ca_cert_file and user and auth_mechanism == 'SCRAM-SHA-256':
-            con.the_database.authenticate(user, mechanism='SCRAM-SHA-256')
-        elif ssl_cert and ssl_ca_cert_file and user and auth_mechanism == 'SCRAM-SHA-1':
-            con.the_database.authenticate(user, mechanism='SCRAM-SHA-1')
-        elif ssl_cert and ssl_ca_cert_file and user and auth_mechanism == 'MONGODB-X509':
-            con.the_database.authenticate(user, mechanism='MONGODB-X509')
+        # if ssl_cert and ssl_ca_cert_file and user and auth_mechanism == 'SCRAM-SHA-256':
+        #     con.the_database.authenticate(user, mechanism='SCRAM-SHA-256')
+        # elif ssl_cert and ssl_ca_cert_file and user and auth_mechanism == 'SCRAM-SHA-1':
+        #     con.the_database.authenticate(user, mechanism='SCRAM-SHA-1')
+        # elif ssl_cert and ssl_ca_cert_file and user and auth_mechanism == 'MONGODB-X509':
+        #     con.the_database.authenticate(user, mechanism='MONGODB-X509')
 
         try:
           result = con.admin.command("ismaster")
@@ -351,12 +356,12 @@ def mongo_connect(host=None, port=None, ssl=False, user=None, passwd=None, repli
             print("OK - State: 7 (Arbiter on port %s)" % (port))
             sys.exit(0)
 
-        if user and passwd:
-            db = con[authdb]
-            try:
-              db.authenticate(user, password=passwd)
-            except PyMongoError:
-                sys.exit("Username/Password incorrect")
+        # if user and passwd:
+        #     db = con[authdb]
+        #     try:
+        #       db.authenticate(user, password=passwd)
+        #     except PyMongoError:
+        #         sys.exit("Username/Password incorrect")
 
         # Ping to check that the server is responding.
         con.admin.command("ping")
